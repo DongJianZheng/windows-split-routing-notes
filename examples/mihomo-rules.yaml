@@ -1,0 +1,15 @@
+# Public example only. Replace placeholders locally.
+rules:
+  - DOMAIN-SUFFIX,<COMPANY_DOMAIN>,DIRECT
+  - GEOIP,PRIVATE,DIRECT
+  - GEOSITE,CN,DIRECT
+  - GEOIP,CN,DIRECT
+  - MATCH,PROXY
+
+# DNS policy example:
+# nameserver:
+#   - https://doh.pub/dns-query
+# nameserver-policy:
+#   "+.<COMPANY_DOMAIN>":
+#     - <COMPANY_DNS>
+

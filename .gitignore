@@ -1,0 +1,13 @@
+# Local/private values — never publish
+private.local.md
+*.local.yaml
+*.local.json
+*.ovpn
+*.log
+
+# Editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
