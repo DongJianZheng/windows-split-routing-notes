@@ -70,23 +70,16 @@ if (-not $NodeIp) {
             Group-Object RemotePort |
             Sort-Object Count -Descending)
 
-        if ($portGroups.Count -eq 0 -or $portGroups[0].Count -lt 2) {
+        $eligiblePorts = @($portGroups |
+            Where-Object { $_.Count -ge 2 } |
+            Select-Object -First 8 |
+            ForEach-Object { [int]$_.Name })
+
+        if ($eligiblePorts.Count -eq 0) {
             throw 'Cannot identify the node port safely. Generate proxy traffic or pass -NodePort.'
         }
 
-        if ($portGroups.Count -gt 1) {
-            $topCount = [int]$portGroups[0].Count
-            $secondCount = [int]$portGroups[1].Count
-            if ($secondCount -ge [Math]::Ceiling($topCount * 0.75)) {
-                $summary = (($portGroups | Select-Object -First 4 | ForEach-Object {
-                    "$($_.Name):$($_.Count)"
-                }) -join ', ')
-                throw "Candidate ports are too close ($summary). Pass -NodePort to avoid changing the wrong route."
-            }
-        }
-
-        $detectedPort = [int]$portGroups[0].Name
-        $nodeConnections = @($connections | Where-Object { $_.RemotePort -eq $detectedPort })
+        $nodeConnections = @($connections | Where-Object { $_.RemotePort -in $eligiblePorts })
     }
 
     $candidateRows = @($nodeConnections |
@@ -94,7 +87,7 @@ if (-not $NodeIp) {
         ForEach-Object {
             [pscustomobject]@{
                 NodeIp = $_.Name
-                NodePort = $detectedPort
+                NodePort = (($_.Group.RemotePort | Sort-Object -Unique) -join ',')
                 Connections = $_.Count
                 CurrentLocalAddresses = (($_.Group.LocalAddress | Sort-Object -Unique) -join ',')
             }
@@ -102,9 +95,9 @@ if (-not $NodeIp) {
         Sort-Object Connections -Descending)
 
     if ($candidateRows.Count -eq 0) {
-        throw "No YouTu connection was found on remote port $detectedPort. Generate proxy traffic and retry."
+        throw 'No eligible YouTu node connection was found. Generate proxy traffic and retry.'
     }
-    if ($candidateRows.Count -gt 6) {
+    if ($candidateRows.Count -gt 12) {
         throw "Found $($candidateRows.Count) candidate IPs. Pass -NodePort or -NodeIp to avoid changing the wrong route."
     }
     $NodeIp = @($candidateRows.NodeIp)
