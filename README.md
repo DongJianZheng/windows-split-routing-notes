@@ -158,7 +158,44 @@ Test-NetConnection 127.0.0.1 -Port 7897
 - `docs/index.html`：适合浏览器阅读和后续改成公众号文章的版本。
 - `examples/mihomo-rules.yaml`：脱敏的规则片段。
 - `scripts/diagnose.ps1`：只读诊断脚本。
+- `scripts/set-youtu-wifi-route.ps1`：自动识别悠兔节点并固定到 Wi-Fi 的管理员脚本。
 - `private.local.md`：本机真实参数，已被 `.gitignore` 排除。
+
+## 自动固定悠兔节点到 Wi-Fi
+
+先连接手机 Wi-Fi 热点并启动悠兔，产生一次代理流量，然后以管理员身份运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\set-youtu-wifi-route.ps1
+```
+
+脚本会：
+
+1. 自动读取 `WLAN` 的 IPv4、网关和接口编号。
+2. 从 `YouTuCore` 的已建立连接中寻找连接数最多的非标准远程端口。
+3. 收集该端口对应的全部公网节点 IP。
+4. 检查并添加指向 Wi-Fi 网关的持久 `/32` 路由。
+5. 识别结果不够明确时停止，不盲目修改路由。
+
+只预览、不修改路由：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\set-youtu-wifi-route.ps1 -NoApply
+```
+
+已知节点端口时，可减少误判：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\set-youtu-wifi-route.ps1 -NodePort 30031
+```
+
+手动指定节点 IP：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\set-youtu-wifi-route.ps1 `
+  -NodeIp <NODE_IP_1>,<NODE_IP_2> `
+  -NodePort <NODE_PORT>
+```
 
 ## 发布前检查
 
@@ -166,4 +203,3 @@ Test-NetConnection 127.0.0.1 -Port 7897
 - 不提交 `.ovpn`、订阅 YAML、客户端日志或截图原图。
 - 命令全部使用 `<PLACEHOLDER>`，避免读者误抄本机参数。
 - 说明静态路由需要管理员权限，并提醒节点切换后需要更新。
-
