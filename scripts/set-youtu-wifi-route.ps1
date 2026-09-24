@@ -3,6 +3,7 @@ param(
     [string]$WifiAlias = 'WLAN',
     [string[]]$NodeIp,
     [int]$NodePort,
+    [string]$VpsHost,
     [switch]$NoApply
 )
 
@@ -50,9 +51,10 @@ $detectedPort = $NodePort
 $candidateRows = @()
 
 if (-not $NodeIp) {
-    $processIds = @(Get-Process YouTuCore, YouTu -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+    # YouTu may run directly as YouTuCore, or through Clash Verge's Mihomo core.
+    $processIds = @(Get-Process YouTuCore, YouTu, verge-mihomo, clash-verge -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
     if ($processIds.Count -eq 0) {
-        throw 'YouTu or YouTuCore is not running. Start YouTu and connect a node first.'
+        throw 'YouTu/YouTuCore or Clash Verge is not running. Start the client and connect a node first.'
     }
 
     $connections = @(Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue |
@@ -61,8 +63,22 @@ if (-not $NodeIp) {
             (Test-PublicIPv4 $_.RemoteAddress)
         })
 
+    $isClashCore = @(Get-Process verge-mihomo, clash-verge -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id |
+        Where-Object { $processIds -contains $_ }).Count -gt 0
+
     if ($detectedPort -gt 0) {
         $nodeConnections = @($connections | Where-Object { $_.RemotePort -eq $detectedPort })
+    } elseif ($isClashCore) {
+        # Mihomo subscription nodes commonly use TCP/443. Exclude the VPS
+        # endpoint so its outer connection can keep using the wired route.
+        $vpsIps = @()
+        if ($VpsHost) {
+            $vpsIps = @(Resolve-DnsName $VpsHost -Type A -ErrorAction SilentlyContinue |
+                Where-Object { $_.Type -eq 'A' -and $_.IPAddress } |
+                Select-Object -ExpandProperty IPAddress)
+        }
+        $nodeConnections = @($connections |
+            Where-Object { $_.RemotePort -eq 443 -and $_.RemoteAddress -notin $vpsIps })
     } else {
         $commonPorts = @(53, 80, 123, 443, 853)
         $portGroups = @($connections |
@@ -144,7 +160,9 @@ foreach ($address in $NodeIp) {
         continue
     }
 
-    & route.exe delete $address *> $null
+    # The route may not exist yet; suppress the expected "element not found"
+    # message so strict PowerShell error handling does not abort the script.
+    & cmd.exe /c "route.exe delete $address >nul 2>&1"
     & route.exe -p add $address mask 255.255.255.255 $wifiGateway if $wifiIndex metric 1 | Out-Host
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to add route: $address -> $wifiGateway (if $wifiIndex)"

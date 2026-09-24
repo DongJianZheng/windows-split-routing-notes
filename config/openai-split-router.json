@@ -1,0 +1,48 @@
+{
+  "log": {
+    "level": "warn",
+    "timestamp": true
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "split-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7899,
+      "set_system_proxy": false
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "socks",
+      "tag": "openai-vps",
+      "server": "127.0.0.1",
+      "server_port": 7898,
+      "version": "5"
+    },
+    {
+      "type": "socks",
+      "tag": "youtu-default",
+      "server": "127.0.0.1",
+      "server_port": 7897,
+      "version": "5"
+    }
+  ],
+  "route": {
+    "rules": [
+      {
+        "domain_suffix": [
+          "openai.com",
+          "chatgpt.com",
+          "chatgpt.site",
+          "chatgpt-team.site",
+          "oaistatic.com",
+          "oaiusercontent.com"
+        ],
+        "action": "route",
+        "outbound": "openai-vps"
+      }
+    ],
+    "final": "youtu-default"
+  }
+}

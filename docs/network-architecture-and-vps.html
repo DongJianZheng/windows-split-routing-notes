@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Windows 分流网络架构与 VPS 部署笔记</title>
+<style>
+:root{--ink:#152238;--muted:#65738b;--line:#d9e3ef;--bg:#f4f7fb;--paper:#fff;--blue:#1769c2;--green:#087b58;--orange:#a45a0a;--purple:#6442a8;--red:#a83c35}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.75 "Microsoft YaHei","PingFang SC",system-ui,sans-serif}.paper{max-width:1120px;margin:auto;background:var(--paper);box-shadow:0 10px 40px #24456d17}header{padding:58px 68px;color:#fff;background:linear-gradient(135deg,#153a70,#1977ca)}header small{letter-spacing:.16em;opacity:.8}h1{font-size:38px;line-height:1.25;margin:12px 0;max-width:800px}header p{margin:0;max-width:800px;font-size:18px;opacity:.9}main{padding:42px 68px 72px}h2{color:#16457f;font-size:26px;margin:42px 0 14px}h2:first-child{margin-top:0}h3{margin:0 0 8px;font-size:18px}.note{padding:15px 18px;border:1px solid #cfe0f5;border-left:4px solid var(--blue);background:#eef6ff;border-radius:8px;margin:16px 0}.warn{border-color:#f0cf9d;border-left-color:var(--orange);background:#fff7ea}.danger{border-color:#edc0bb;border-left-color:var(--red);background:#fff2f0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.card{border:1px solid var(--line);border-radius:12px;padding:17px;background:#fff}.card ul{padding-left:20px;margin:8px 0 0}.diagram{border:1px solid var(--line);border-radius:14px;padding:12px;background:#fbfdff}.diagram svg{display:block;width:100%;height:auto}.caption{text-align:center;color:var(--muted);font-size:14px}table{border-collapse:collapse;width:100%;margin:12px 0 18px}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}th{background:#f3f7fc;color:#31537d}code{font-family:Consolas,"Cascadia Mono",monospace;background:#f0f4f8;color:#174679;border-radius:4px;padding:2px 5px}pre{background:#12243c;color:#e9f2ff;padding:16px 18px;border-radius:9px;overflow:auto;font:14px/1.65 Consolas,"Cascadia Mono",monospace}.small{font-size:14px;color:var(--muted)}.footer{border-top:1px solid var(--line);margin-top:42px;padding-top:18px;color:var(--muted);font-size:14px}@media(max-width:720px){header{padding:40px 24px}h1{font-size:29px}main{padding:30px 24px 52px}.grid{grid-template-columns:1fr}table{font-size:13px}}
+</style>
+</head>
+<body><article class="paper">
+<header><small>NETWORK NOTE · 2026-09-24</small><h1>Windows 多网卡分流与 VPS 出口架构</h1><p>一份可长期维护的实践笔记：国内直连、OpenAI/Codex/GitHub 走 VPS、其他境外网站走悠兔，以及手机 Wi‑Fi 节点路由。</p></header>
+<main>
+<h2>一、最终架构</h2>
+<div class="diagram">
+<svg viewBox="0 0 980 560" role="img" aria-labelledby="title desc"><title id="title">Windows 多网络分流总架构</title><desc id="desc">应用通过 Clash Verge 规则分流到有线、VPS、悠兔和 OpenVPN。</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L0 6L8 3Z" fill="#46627e"/></marker></defs>
+<style>.box{stroke:#46627e;stroke-width:1.5}.t{font:700 17px 'Microsoft YaHei';fill:#172d49}.s{font:14px 'Microsoft YaHei';fill:#5e7187}.l{fill:none;stroke:#46627e;stroke-width:2.2;marker-end:url(#arrow)}.tag{font:700 13px 'Microsoft YaHei';fill:#245588}</style>
+<rect x="30" y="210" width="165" height="110" rx="13" fill="#eef6ff" class="box"/><text x="112" y="252" text-anchor="middle" class="t">浏览器 / Codex / Git</text><text x="112" y="280" text-anchor="middle" class="s">HTTP/Mixed :7897</text>
+<rect x="260" y="165" width="235" height="200" rx="14" fill="#edf9f3" class="box"/><text x="377" y="207" text-anchor="middle" class="t">Clash Verge</text><text x="377" y="235" text-anchor="middle" class="s">Rule 模式 · TUN 关闭</text><text x="377" y="267" text-anchor="middle" class="s">VPS / 悠兔 / DIRECT</text><text x="377" y="310" text-anchor="middle" class="tag">唯一系统代理入口</text><path d="M195 265H259" class="l"/>
+<path d="M495 205C590 100 650 78 760 78" class="l"/><text x="555" y="119" class="tag">OpenAI / GitHub</text><rect x="760" y="30" width="185" height="98" rx="13" fill="#fff0e1" class="box"/><text x="852" y="70" text-anchor="middle" class="t">VPS</text><text x="852" y="98" text-anchor="middle" class="s">VLESS/WSS/TLS :443</text>
+<path d="M495 265H760" class="l"/><text x="575" y="252" class="tag">国内 DIRECT</text><rect x="760" y="216" width="185" height="98" rx="13" fill="#eef6ff" class="box"/><text x="852" y="256" text-anchor="middle" class="t">有线网络</text><text x="852" y="284" text-anchor="middle" class="s">普通直连出口</text>
+<path d="M495 325C590 430 650 458 760 458" class="l"/><text x="552" y="430" class="tag">其他境外</text><rect x="760" y="410" width="185" height="98" rx="13" fill="#fff7e8" class="box"/><text x="852" y="450" text-anchor="middle" class="t">悠兔</text><text x="852" y="478" text-anchor="middle" class="s">节点外层固定到 WLAN</text>
+<rect x="30" y="410" width="165" height="98" rx="13" fill="#f2efff" class="box"/><text x="112" y="450" text-anchor="middle" class="t">OpenVPN</text><text x="112" y="478" text-anchor="middle" class="s">公司路由 / DNS</text><path d="M195 458C220 458 230 352 260 352" class="l"/>
+</svg><p class="caption">规则决定“哪个出口”；Windows 路由决定“哪个物理网卡”。</p></div>
+
+<h2>二、为什么这样设计</h2>
+<div class="grid"><section class="card"><h3>稳定</h3><p>VPS 作为 OpenAI、Codex 和 GitHub 的固定出口，减少节点频繁变化导致的登录验证和连接变化。</p></section><section class="card"><h3>兼容</h3><p>只开启系统代理、不启用 TUN，避免接管 OpenVPN、微信、ToDesk 等不应代理的程序。</p></section><section class="card"><h3>可切换</h3><p>悠兔订阅自动更新，VPS 和规则放在覆写模板中，订阅更新不会覆盖自定义配置。</p></section></div>
+
+<h2>三、当前配置索引</h2>
+<table><thead><tr><th>项目</th><th>位置/值</th><th>作用</th></tr></thead><tbody>
+<tr><td>Clash Verge</td><td><code>D:\Program Files\Clash Verge</code></td><td>主代理客户端</td></tr>
+<tr><td>用户配置</td><td><code>%APPDATA%\io.github.clash-verge-rev.clash-verge-rev</code></td><td>订阅、覆写、运行配置</td></tr>
+<tr><td>HTTP/Mixed</td><td><code>127.0.0.1:7897</code></td><td>系统代理和浏览器入口</td></tr>
+<tr><td>SOCKS</td><td><code>127.0.0.1:7896</code></td><td>需要 SOCKS 的程序</td></tr>
+<tr><td>VPS 组</td><td><code>VPS-OpenAI-Git</code></td><td>OpenAI、Codex、GitHub</td></tr>
+<tr><td>悠兔组</td><td>订阅节点/自动选择</td><td>其他境外服务</td></tr>
+<tr><td>Wi‑Fi 路由脚本</td><td><code>scripts\set-youtu-wifi-route.ps1</code></td><td>将悠兔节点 IP 固定到手机 Wi‑Fi</td></tr>
+</tbody></table>
+
+<h2>四、VPS 部署操作</h2>
+<p>当前电脑使用的是 VPS 的 VLESS + WebSocket + TLS 出口。以下是新 VPS 的通用部署流程；真实域名、UUID 和证书不要写入公开文章或 GitHub。</p>
+<h3>1. 准备 VPS</h3><pre># Debian/Ubuntu
+sudo apt update && sudo apt install -y curl unzip ufw
+sudo ufw allow 22/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable</pre>
+<h3>2. 准备域名和 TLS</h3><p>将域名 A/AAAA 记录指向 VPS。生产环境使用 443/TLS；证书可以由 Caddy/Nginx 管理，也可以由 sing-box 直接管理。不要把管理面板暴露在公网。</p>
+<h3>3. 安装代理核心</h3><pre># 推荐使用官方 sing-box 安装方式，并固定版本
+sudo mkdir -p /etc/sing-box
+sudo install -m 700 -d /var/lib/sing-box
+# 将经过审计的 sing-box 二进制放入 /usr/local/bin/sing-box
+# 将配置写入 /etc/sing-box/config.json
+sudo systemctl enable --now sing-box
+sudo systemctl status sing-box</pre>
+<h3>4. 配置要点</h3><pre>{
+  "inbounds": [{
+    "type": "vless",
+    "listen": "127.0.0.1",
+    "listen_port": 10000,
+    "users": [{"uuid": "&lt;RANDOM-UUID&gt;"}],
+    "transport": {"type": "ws", "path": "/&lt;RANDOM-PATH&gt;"},
+    "tls": {"enabled": true, "certificate_path": "/etc/ssl/fullchain.pem", "key_path": "/etc/ssl/privkey.pem"}
+  }],
+  "outbounds": [{"type": "direct"}]
+}</pre><p class="small">上面是结构示意，不要直接复制到生产环境。实际配置应按当前 sing-box 版本校验，并使用随机 UUID、随机 WS 路径和最小权限运行。</p>
+<h3>5. Windows 端导入</h3><p>在 v2rayN 或 Clash Verge 中添加 VPS 节点，确认服务器、端口 443、UUID、TLS SNI、WebSocket 路径完全一致。然后只把该节点放入 <code>VPS-OpenAI-Git</code> 代理组。</p>
+
+<h2>五、日常切换流程</h2>
+<ol><li>启动 Clash Verge，确认系统代理开启、规则模式开启、TUN 关闭。</li><li>VPS 组选择 <code>VPS-OpenAI-Git</code>，悠兔组选择自动选择或固定节点。</li><li>连接手机 Wi‑Fi 后运行 Wi‑Fi 路由脚本；切换悠兔节点后再次运行。</li><li>启动或重启浏览器、桌面 Codex，确保重新读取 <code>7897</code>。</li><li>OpenVPN 保持无代理（Proxy=None），公司域名和内网由 OpenVPN 自己处理。</li></ol>
+<pre>cd 'D:\工作工具\windows-split-routing-notes'
+powershell -ExecutionPolicy Bypass -File .\scripts\set-youtu-wifi-route.ps1</pre>
+
+<h2>六、现在安全吗？</h2>
+<div class="note"><strong>结论：</strong>从配置结构看，当前方案属于“可控、风险中等”的个人网络方案；但不能承诺绝对安全或绝对不封号。安全性取决于 VPS、代理订阅、系统权限和密钥管理。</div>
+<table><thead><tr><th>风险</th><th>判断</th><th>建议</th></tr></thead><tbody>
+<tr><td>VPS 出口 IP</td><td>数据中心 IP 可能触发验证码或风控</td><td>保持固定出口，避免频繁切换，不要共享给他人</td></tr>
+<tr><td>订阅泄露</td><td>订阅链接通常等同于账号凭据</td><td>不要提交 GitHub、截图或公开文章；泄露后立即重置</td></tr>
+<tr><td>VPS 服务暴露</td><td>开放端口和弱口令会增加攻击面</td><td>只开放必要端口，SSH 使用密钥，及时更新系统</td></tr>
+<tr><td>公司网络</td><td>错误代理可能导致内网数据外发</td><td>公司域名、私网、OpenVPN 程序固定 DIRECT</td></tr>
+<tr><td>DNS/IPv6 绕过</td><td>可能导致规则和出口不一致</td><td>排错阶段关闭 IPv6，使用明确的 DNS 策略</td></tr>
+<tr><td>TUN</td><td>接管范围大，可能影响 OpenVPN 和多网卡路由</td><td>当前方案保持 TUN 关闭</td></tr>
+</tbody></table>
+<div class="note warn">不要在公开文章中出现真实订阅 URL、UUID、公司域名、内网网段、VPS 登录信息、完整日志或截图。文档中的占位符必须替换后再发布。</div>
+
+<h2>七、验证命令</h2><pre>Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' |
+  Select-Object ProxyEnable,ProxyServer,AutoConfigURL
+
+Test-NetConnection 127.0.0.1 -Port 7897
+
+$pid = (Get-Process verge-mihomo).Id
+Get-NetTCPConnection -State Established -OwningProcess $pid |
+  Select-Object LocalAddress,RemoteAddress,RemotePort</pre>
+<p class="small">看到 ChatGPT/GitHub 命中 VPS、国内站点 DIRECT，并且悠兔节点的 LocalAddress 为手机 Wi‑Fi 地址，说明三层配置都生效。</p>
+<div class="footer">本文是个人网络配置复盘，不是对任何代理服务、账号或网络环境的安全保证。发布前请再次脱敏并验证命令与软件版本。</div>
+</main></article></body></html>

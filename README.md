@@ -156,6 +156,8 @@ Test-NetConnection 127.0.0.1 -Port 7897
 
 - `README.md`：公开、可复用的技术笔记。
 - `docs/index.html`：适合浏览器阅读和后续改成公众号文章的版本。
+- `docs/current-network-setup.md`：当前电脑实际网络配置、原理、文件位置和排错复盘。
+- `docs/network-architecture-and-vps.html`：总架构图、VPS 部署流程和安全风险说明。
 - `examples/mihomo-rules.yaml`：脱敏的规则片段。
 - `scripts/diagnose.ps1`：只读诊断脚本。
 - `scripts/set-youtu-wifi-route.ps1`：自动识别悠兔节点并固定到 Wi-Fi 的管理员脚本。
@@ -203,3 +205,54 @@ powershell -ExecutionPolicy Bypass -File .\scripts\set-youtu-wifi-route.ps1 `
 - 不提交 `.ovpn`、订阅 YAML、客户端日志或截图原图。
 - 命令全部使用 `<PLACEHOLDER>`，避免读者误抄本机参数。
 - 说明静态路由需要管理员权限，并提醒节点切换后需要更新。
+
+## 当前 Clash Verge 配置索引（2026-09-24）
+
+当前采用“远程订阅 + 覆写模板”的方式，不要把远程订阅文件和覆写内容手工重复合并，否则会出现 `duplicate name`。
+
+Clash Verge 安装目录：
+
+```text
+D:\Program Files\Clash Verge
+```
+
+用户配置目录：
+
+```text
+C:\Users\11756\AppData\Roaming\io.github.clash-verge-rev.clash-verge-rev
+```
+
+关键文件：
+
+```text
+profiles.yaml                         # 当前订阅及覆写模板关联
+profiles\Rf4SxaWArEv3.yaml             # 悠兔远程订阅（更新时会被重写）
+profiles\pbfpRUSgwVjH.yaml             # VPS 代理覆写
+profiles\gccbkMr7KodN.yaml             # VPS 代理组覆写
+profiles\rkWdhCQ9Svzf.yaml             # OpenAI/GitHub/国内/悠兔规则覆写
+verge.yaml                             # Clash Verge 界面设置
+config.yaml                            # 运行时基础端口设置
+```
+
+端口约定：
+
+```text
+Clash HTTP/Mixed：127.0.0.1:7897
+Clash SOCKS：    127.0.0.1:7896
+旧 v2rayN：      127.0.0.1:7898（不再作为系统代理）
+```
+
+分流逻辑：
+
+```text
+ChatGPT / Codex / OpenAI / GitHub → VPS-OpenAI-Git
+Google 等其他境外网站             → 悠兔
+国内网站、微信、ToDesk、OpenVPN   → DIRECT
+```
+
+注意事项：
+
+- 远程悠兔订阅会自动更新；VPS 和规则应放在覆写模板中。
+- 同一个代理名或代理组名只能出现一次；不要同时把 VPS 直接写入远程订阅和覆写模板。
+- 只有手机 Wi-Fi 连接时，悠兔节点路由脚本才能把节点固定到 WLAN；切换节点后需要重新运行 `scripts\set-youtu-wifi-route.ps1`。
+- 当前使用 Clash Verge 时，保持规则模式、系统代理开启、TUN 关闭；IPv6 建议关闭以避免绕过 IPv4 分流。
